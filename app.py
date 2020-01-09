@@ -30,6 +30,7 @@ from octomachinery.app.routing.decorators import process_webhook_payload
 from octomachinery.app.runtime.context import RUNTIME_CONTEXT
 from octomachinery.github.config.app import GitHubAppIntegrationConfig
 from octomachinery.github.api.app_client import GitHubApp
+from octomachinery.github.api.raw_client import GitHubAPI
 from octomachinery.utils.versiontools import get_version_from_scm_tag
 
 from thoth.common import init_logging
@@ -66,6 +67,26 @@ async def on_install(
     """React to GitHub App integration installation webhook event."""
     _LOGGER.info("installed event install id %s", installation["id"])
     _LOGGER.info("installation=%s", RUNTIME_CONTEXT.app_installation)
+
+
+@process_event("pull_request")
+@process_webhook_payload
+async def on_pull_request(action, number, pull_request, repository, installation, **kwargs):
+    """React to GitHub App pull_request event."""
+    _LOGGER.info("a pull_request #%d has been %s: %s", number, action, pull_request["html_url"])
+
+    repo: str = repository["full_name"]
+    head_sha: str = pull_request["head"]["sha"]
+
+    api_url = f"/repos/{repo}/check-runs"
+
+    # if action == "opened":
+    github_api: GitHubAPI = RUNTIME_CONTEXT.app_installation_client
+    github_api.post(
+        api_url,
+        {"name": "Thoth: Advise", "head_sha": head_sha},
+        accept="application/vnd.github.antiope-preview+json"
+    )
 
 
 if __name__ == "__main__":
